@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Badbollen solver</title>
+<style>
+:root{--bg:#ffffff;--fg:#1c1a17;--muted:#6b645c;--line:#e4dfd8;--acc:#7a5c3e;--code:#f7f4ef;color-scheme:light}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 Georgia,"Iowan Old Style","Palatino Linotype",serif}
+main{max-width:820px;margin:0 auto;padding:44px 28px 70px}
+h1{font-size:26px;font-weight:600;margin:0 0 6px;letter-spacing:-0.01em}
+h2{font-size:16px;font-weight:600;margin:32px 0 8px;color:var(--acc);text-transform:none}
+p{margin:8px 0}ul,ol{padding-left:22px}li{margin:6px 0}
+table{border-collapse:collapse;margin:14px 0;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{font-weight:600;color:var(--muted);border-bottom:1px solid #cfc7bd}
+code{background:var(--code);padding:1px 5px;border-radius:3px;font:13px ui-monospace,Menlo,Consolas,monospace;color:#3f3730}
+pre{background:var(--code);border-left:2px solid #d8cfc3;padding:10px 14px;overflow-x:auto;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;color:#3f3730}
+.sub{color:var(--muted);margin-bottom:24px}
+hr{border:0;border-top:1px solid var(--line);margin:44px 0}
+</style></head><body><main>
+<h1>Badbollen: action-matrix solver</h1>
+<p class="sub">Three concentric balls, six colored great circles each. Session summary, 11 Sept 2026.</p>
+
+<p><strong>The action-matrix solver works.</strong> <code>bigraded_action2.py</code> in <code>/home/martin/badbollen/</code> solves a generic instance with one 600×600 generalized eigenproblem, no path tracking. Validated on three instances:</p>
+
+<table>
+<tr><th>instance</th><th>eigenvalues</th><th>real eigenvalues</th><th>real solutions by random restarts</th><th>distinct solutions after polish</th><th>max residual after polish</th></tr>
+<tr><td>0</td><td>600</td><td>72</td><td>72</td><td>600 (all 600 match the monodromy reference set)</td><td>7e-10</td></tr>
+<tr><td>1</td><td>600</td><td>64</td><td>64, all found</td><td>600</td><td>5e-11</td></tr>
+<tr><td>2</td><td>600</td><td>60</td><td>60, all found</td><td>600</td><td>4e-10</td></tr>
+</table>
+
+<p>Before polishing, 595 of 600 solutions on instance 0 already agree with the reference to 1e-8. Runtime is about 75 s standalone with untuned dense linear algebra.</p>
+
+<h2>Why templates failed, and what fixed it</h2>
+<p>The obstruction was never the 600 solutions. It was where the saturation happens. In the affine Cayley ring, or with a Rabinowitsch variable, the low-degree generators of the saturated ideal only appear with multipliers of degree 15 to 19, so a template needs hundreds of thousands of columns. Two facts, both measured, turn that around:</p>
+<ul>
+<li>In the bihomogeneous ring over P³ × P³ with unnormalized quaternions, each bidegree piece of the raw ideal is spanned exactly by the bounded monomial multiples. The "hidden" low-degree elements that inflate the affine computations are an artifact of dehomogenizing (the exact Singular count: 744 elements of degree ≤ 7 in the affine ideal versus 504 reachable by bounded multiples).</li>
+<li>Exponent 1 suffices. Singular confirmed that (I : s2) already contains the full degree-≤7 part of the saturated ideal, and numerically the quotient (I : s3) at bidegree (5,4) and (I : s2) at (5,5) both have codimension exactly 600, the maximum possible, so they equal the ideal of the 600 points. Bidegree (4,4) is below regularity (codimension 580) and (I : s2) at (5,4) is insufficient (660), so the choice of factor and bidegree matters.</li>
+</ul>
+
+<h2>The method</h2>
+<p>For a bidegree (i,j) and a quadric h, the piece (I : h) is the left null space of Bm·Z, where Z spans the orthogonal complement of the Macaulay rows at bidegree (i,j)+deg(h) and Bm holds h times the monomials of bidegree (i,j). The singular-value gap is 1e-2 to 1e-13, so it is numerically unambiguous. Then V = quotient at (5,4), W = quotient at (5,5), bases picked by pivoted QR (condition numbers about 60), multiplication maps by e and f from V to W, and the eigenvalues of the pencil (M_f, M_e) are f/e at the solutions. The eigenvectors are the values of the W basis monomials at each solution, and the point is read off from monomial ratios. The largest blocks are a 4200×4704 and a 6720×6720 Macaulay matrix.</p>
+
+<p><strong>Unit quaternions and the 18-variable form</strong> were not the answer on their own. Unit quaternions removed the spurious component but the basis still reached degree 11 with cofactors at 15, because the spurious set moves to infinity of the affine closure. The 18-variable Gröbner basis ran over 40 minutes and 2 GB before being killed.</p>
+
+<h2>To run on your configuration</h2>
+<pre>cd ~/badbollen &amp;&amp; .venv/bin/python bigraded_action2.py my_config.txt</pre>
+<p>The config is 18 rows of normals (ball 1 colors 1..6, then ball 2, then ball 3). Output goes to <code>am_sols_&lt;name&gt;_real.txt</code> with unit quaternions for R2, R3 and the six meeting points. Use the venv: the system numpy links the reference BLAS and is about ten times slower.</p>
+
+<h2>Left undone</h2>
+<p>Obvious speedups are untouched: the Koszul syzygies (150 and 300 dependent rows) could be dropped analytically, and the QR factorizations could be replaced by cheaper rank-revealing steps. Behaviour on non-generic configurations (symmetric layouts, identical balls) is untested; the solver bails out if a quotient dimension isn't 600. The exact Singular confirmation of the bigraded quotient dimensions timed out after 1.5 hours and was stopped, so those particular numbers rest on the numerical gaps, which are clean, and on the end-to-end validation.</p>
+
+<hr>
+<h1 style="font-size:22px;margin-top:0">The method, explained from the top</h1>
+
+<h2>Setup</h2>
+<p>Unknowns are two quaternions q2 = (a,b,c,d) and q3 = (e,f,g,h), both projective, so (q2, q3) is a point of P³ × P³. R(q) is the polynomial rotation matrix, quadratic in q, equal to (q·q) times a genuine rotation. The six input equations are</p>
+<p style="text-align:center">E<sub>c</sub> = det(a<sub>c</sub>, R(q2) b<sub>c</sub>, R(q3) c<sub>c</sub>), &nbsp; c = 1..6,</p>
+<p>each bihomogeneous of bidegree (2,2). Let I be the ideal they generate. Write s2 = a²+b²+c²+d² and s3 = e²+f²+g²+h². Solutions with s2 = 0 or s3 = 0 are the spurious rank-1 ones; the 600 genuine solutions have both nonzero.</p>
+
+
+<h2>Definitions used below</h2>
+<p><strong>s2 and s3.</strong> The squared norms of the two unknown quaternions as polynomials: s2 = a² + b² + c² + d² for q2 = (a,b,c,d), and s3 = e² + f² + g² + h² for q3. For real quaternions they never vanish; over the complex numbers s2 = 0 is a quadric surface in P³, the null quaternions, on which R(q2) degenerates to a rank-1 matrix. Those are the spurious solutions, so s2 = 0 and s3 = 0 are the equations of the bad locus.</p>
+<p><strong>Ideal quotient (I : h).</strong> The set of polynomials g such that h·g lies in I, written (I : h) = { g : h·g ∈ I }. It is an ideal in the same ring and contains I. No equivalence classes are involved; the name is by analogy with division, since (h·f) : h = (f). Geometrically it removes one layer of the solutions on h = 0: a polynomial g that vanishes on the genuine solutions but not on the spurious ones is not in I, but s2·g vanishes wherever I does, and if it vanishes to sufficient order it belongs to I, so g belongs to (I : s2).</p>
+<p><strong>Saturation (I : h<sup>∞</sup>).</strong> The union of (I : h<sup>k</sup>) over all k, i.e. the quotient repeated until it stabilises. Its zero set is exactly the zero set of I with everything on h = 0 removed. This is what Singular's <code>sat</code> computes and what gave the count 600. The quotient is one step of it; the two coincide when the spurious solutions are cleared by a single factor of h, which is the case measured here in the bidegrees used.</p>
+<p><strong>Quotient ring P/I and quotient space.</strong> The other meaning of "quotient": polynomials modulo the ideal, g ~ g' iff g − g' ∈ I. When I has finitely many solutions this is a finite-dimensional vector space whose dimension is the number of solutions, and multiplication by a variable is a linear map on it whose eigenvalues are that variable's values at the solutions. In the bigraded setting the same idea is applied one bidegree at a time: V is the bidegree-(5,4) polynomials modulo the ideal piece there. A basis of V is a set of monomials chosen as class representatives, and the normal form NF(p) of a polynomial p is the representative of its class expressed in that basis.</p>
+<p>So the pipeline is: colon ideal to get the right ideal piece, then quotient space by it to get the 600-dimensional spaces V and W.</p>
+<h2>Step 1: the ideal of the 600 points, one bidegree at a time</h2>
+<p><strong>Ideal quotient.</strong> For a polynomial h, the quotient (I : h) is the set of polynomials g such that h·g lies in I. It contains I, and it is the algebraic way of "dividing out" solutions on h = 0: if g vanishes on all genuine solutions but not necessarily on the spurious ones, then h·g vanishes everywhere I does, provided one factor of h is enough to kill the spurious part. Saturation is the same thing with arbitrarily high powers of h; the measured fact here is that one power suffices.</p>
+<p><strong>The piece (I : h) at bidegree (i,j).</strong> Since everything is bigraded, g of bidegree (i,j) lies in (I : h) iff h·g lies in the piece of I at bidegree (i,j) + deg(h). That piece is a known finite-dimensional vector space: the span of all products m·E<sub>c</sub> with m a monomial of bidegree (i,j) + deg(h) − (2,2). So the computation is pure linear algebra:</p>
+<ol>
+<li>Build the matrix A whose rows are the coefficient vectors of those products m·E<sub>c</sub>, over all monomials of the target bidegree.</li>
+<li>Compute Z, an orthonormal basis of the orthogonal complement of the row space of A. A polynomial lies in the row space of A iff its coefficient vector is orthogonal to every column of Z.</li>
+<li>Build the matrix Bm whose rows are the coefficient vectors of h·m for every monomial m of bidegree (i,j).</li>
+<li>A combination g = Σ y<sub>m</sub> m lies in (I : h) iff (Σ y<sub>m</sub> h·m)·Z = 0, i.e. iff yᵀ(Bm·Z) = 0. So (I : h) at bidegree (i,j) is the left null space of Bm·Z, found with an SVD. The singular values show a clean gap, about 1e-2 above and 1e-13 below, so the dimension is unambiguous.</li>
+</ol>
+<p><strong>Which bidegrees.</strong> The 600 points impose at most 600 independent linear conditions on the polynomials of any bidegree (i,j). So the codimension of the true ideal piece is at most 600, and if a quotient (I : h) reaches codimension 600 at some bidegree, it must equal the true ideal piece there. Numerically:</p>
+<table>
+<tr><th>bidegree</th><th>codim of (I : s2)</th><th>codim of (I : s3)</th></tr>
+<tr><td>(4,4)</td><td>580</td><td>580</td></tr>
+<tr><td>(5,4)</td><td>660</td><td>600</td></tr>
+<tr><td>(5,5)</td><td>600</td><td>600</td></tr>
+</table>
+<p>So I use (I : s3) at (5,4) and (I : s2) at (5,5). At (4,4) the points impose only 580 conditions, so it is too small to hold the solution structure; that is what "below the regularity index" meant.</p>
+
+<h2>Step 2: two 600-dimensional spaces and multiplication maps</h2>
+<p><strong>Quotient space.</strong> Let V be the space of bidegree-(5,4) polynomials modulo the ideal piece there, and W the same at bidegree (5,5). Both have dimension 600, and a function on the solutions is determined by its values at the 600 points, so V and W are both "the functions on the solution set", written in two different bidegrees.</p>
+<p><strong>Basis.</strong> A basis of V is a set of 600 monomials of bidegree (5,4) that is linearly independent modulo the ideal piece. I choose it by column-pivoted QR of the ideal-piece matrix: the pivot columns are the monomials the ideal can express, the remaining 600 form the basis, and this choice is well conditioned (condition number about 60). Same for W. Call the bases B<sub>V</sub> and B<sub>W</sub>.</p>
+<p><strong>Normal form.</strong> Every bidegree-(5,5) polynomial p is congruent modulo the ideal piece to a unique combination of B<sub>W</sub> monomials, its normal form NF(p). It is computed by one linear solve against the pivot block.</p>
+<p><strong>Multiplication maps.</strong> Multiplying by e (a variable of bidegree (0,1)) sends bidegree (5,4) to (5,5), hence V to W. In the bases, the matrix M<sub>e</sub> has one row per basis monomial m of V, containing NF(e·m) expressed in B<sub>W</sub>. Likewise M<sub>f</sub> for multiplication by f.</p>
+
+<h2>Step 3: the eigenproblem</h2>
+<p>Take a solution point x. Let w(x) be the vector of values of the B<sub>W</sub> monomials at x. For any V-basis monomial m, the polynomial e·m and its normal form NF(e·m) agree at x, because they differ by an element of the ideal, which vanishes at x. Row m of M<sub>e</sub> times w(x) therefore equals e(x)·m(x). Collecting all rows:</p>
+<p style="text-align:center">M<sub>e</sub> w(x) = e(x) · v(x), &nbsp;&nbsp; M<sub>f</sub> w(x) = f(x) · v(x),</p>
+<p>where v(x) is the vector of V-basis values. Eliminating v(x):</p>
+<p style="text-align:center">M<sub>f</sub> w(x) = (f(x)/e(x)) · M<sub>e</sub> w(x).</p>
+<p>That is a generalized eigenvalue problem for the matrix pencil (M<sub>f</sub>, M<sub>e</sub>): the 600 eigenvalues are the ratios f/e at the 600 solutions, and the eigenvectors are the monomial value vectors w(x). Since a basis of W has 600 elements and there are 600 solutions, the w(x) are exactly the eigenvectors and nothing else appears.</p>
+<p><strong>Reading off the point.</strong> An eigenvector gives the values of 600 monomials of bidegree (5,5) at x, up to a common scale. Whenever two basis monomials differ by replacing one a with a b, their ratio equals b/a at x. Averaging such ratios over all available pairs gives (b/a, c/a, d/a) and (f/e, g/e, h/e), which are exactly the Cayley coordinates of the two rotations. A few Newton steps on the original six equations then polish each point to machine precision.</p>
+
+<h2>What is instance-specific and what is not</h2>
+<p>The bidegrees, the factors s3 and s2, and the sizes of all matrices are fixed for the problem. Only the numbers in the Macaulay rows, the pivot choice, and the eigenproblem depend on the instance. In that sense it is a template of the same kind as a classical elimination template, just with the Macaulay matrix living in the bigraded ring and with an explicit quotient-by-s step in the middle. Cost: two null-space computations on blocks of size 4200×4704 and 6720×6720, two 600×1360-type solves, and one 600×600 generalized eigenproblem.</p>
+</main></body></html>

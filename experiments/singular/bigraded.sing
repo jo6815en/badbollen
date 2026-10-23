@@ -1,0 +1,73 @@
+// Bihomogeneous formulation in P^3 x P^3: q2=(a,b,c,d), q3=(e,f,g,h).
+// Compare bigraded Hilbert functions of I_raw, (I_raw : s2^k), and the saturation.
+LIB "matrix.lib"; LIB "elim.lib";
+ring r = 32003, (a,b,c,d,e,f,g,h), dp;
+system("--random", 12345);
+proc rotq(poly w, poly x, poly y, poly z)
+{
+  matrix R[3][3] =
+    w^2+x^2-y^2-z^2, 2*(x*y - w*z),   2*(x*z + w*y),
+    2*(x*y + w*z),   w^2-x^2+y^2-z^2, 2*(y*z - w*x),
+    2*(x*z - w*y),   2*(y*z + w*x),   w^2-x^2-y^2+z^2;
+  return(R);
+}
+matrix R2 = rotq(a,b,c,d); matrix R3 = rotq(e,f,g,h);
+ideal I; int k;
+for (k = 1; k <= 6; k++)
+{
+  matrix n1[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n2[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n3[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix M = concat(n1, R2*n2, R3*n3);
+  I[k] = det(M);
+}
+poly s2 = a^2+b^2+c^2+d^2;
+poly s3 = e^2+f^2+g^2+h^2;
+
+// bidegree of a monomial: (deg in a..d, deg in e..h)
+proc bideg(poly m)
+{
+  intvec e = leadexp(m);
+  return(intvec(e[1]+e[2]+e[3]+e[4], e[5]+e[6]+e[7]+e[8]));
+}
+// dims of (P/J)_{(i,j)} for i+j = d, from standard monomials of degree d
+proc bihilb(ideal J, int dmax)
+{
+  int d; int l; intvec bd;
+  for (d = 0; d <= dmax; d++)
+  {
+    ideal K = kbase(J, d);
+    intvec cnt; cnt[d+1] = 0;   // cnt[i+1] = # standard monomials of bidegree (i, d-i)
+    for (l = 1; l <= size(K); l++) { if (K[l] != 0) { bd = bideg(K[l]); cnt[bd[1]+1] = cnt[bd[1]+1] + 1; } }
+    "  total degree", d, ": (P/J) dims by q2-degree i=0..d:", cnt;
+    kill K;
+  }
+}
+int t0 = timer;
+ideal J0 = std(I);
+"I_raw std time:", timer - t0; "dim:", dim(J0);
+"--- P/I_raw"; bihilb(J0, 8);
+t0 = timer;
+ideal Q1 = std(quotient(I, s2));
+"(I : s2) time:", timer - t0; "dim:", dim(Q1);
+"--- P/(I : s2)"; bihilb(Q1, 8);
+t0 = timer;
+ideal Q2 = std(quotient(I, s2^2));
+"(I : s2^2) time:", timer - t0; "dim:", dim(Q2);
+"--- P/(I : s2^2)"; bihilb(Q2, 8);
+t0 = timer;
+def S = sat(I, s2);
+ideal Js; if (typeof(S) == "list") { Js = S[1]; "sat exponent:", S[2]; } else { Js = S; }
+Js = std(Js);
+"sat time:", timer - t0; "dim:", dim(Js), " degree:", degree(Js);
+"--- P/I_sat"; bihilb(Js, 8);
+"I_sat GB size:", size(Js);
+int mg = 0; for (k = 1; k <= size(Js); k++) { if (deg(Js[k]) > mg) { mg = deg(Js[k]); } }
+"I_sat GB max degree:", mg;
+// bidegrees of minimal generators of I_sat
+ideal G = minbase(Js);
+"minimal generators of I_sat:", size(G);
+intvec bd;
+for (k = 1; k <= size(G); k++) { bd = bideg(G[k]); "   gen", k, "bidegree", bd[1], bd[2]; }
+write(":w Isat_gfp.txt", string(G));
+quit;

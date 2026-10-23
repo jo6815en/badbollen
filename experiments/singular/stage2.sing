@@ -1,0 +1,56 @@
+// Stage-2 analysis: with the saturated ideal's minimal generators as input, how big is the template?
+LIB "elim.lib"; LIB "matrix.lib";
+ring r = 32003, (b,c,d,f,g,h), dp;
+system("--random", 12345);
+proc rot(poly x, poly y, poly z)
+{
+  matrix R[3][3] =
+    1+x^2-y^2-z^2, 2*(x*y - z),     2*(x*z + y),
+    2*(x*y + z),   1-x^2+y^2-z^2,   2*(y*z - x),
+    2*(x*z - y),   2*(y*z + x),     1-x^2-y^2+z^2;
+  return(R);
+}
+matrix R2 = rot(b,c,d); matrix R3 = rot(f,g,h);
+ideal I; int k;
+for (k = 1; k <= 6; k++)
+{
+  matrix n1[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n2[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n3[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix M = concat(n1, R2*n2, R3*n3);
+  I[k] = det(M);
+}
+def S = sat(I, 1+b^2+c^2+d^2);
+ideal J; if (typeof(S) == "list") { J = S[1]; "sat exponent (s2 only):", S[2]; } else { J = S; }
+J = std(J);
+"I_sat (6 vars): dim", dim(J), " vdim", vdim(J), " GB size", size(J);
+int mg = 0; for (k = 1; k <= size(J); k++) { if (deg(J[k]) > mg) { mg = deg(J[k]); } }
+"GB max degree:", mg;
+ideal K = kbase(J);
+int md = 0; intvec kh; kh[12] = 0;
+for (k = 1; k <= size(K); k++) { kh[deg(K[k])+1] = kh[deg(K[k])+1] + 1; if (deg(K[k]) > md) { md = deg(K[k]); } }
+"standard monomials:", size(K), " max degree:", md, " histogram by degree:", kh;
+write(":w kbase6_gfp.txt", string(K));
+ideal G = minbase(J);
+"minimal generators:", size(G);
+intvec gh; gh[12] = 0;
+for (k = 1; k <= size(G); k++) { gh[deg(G[k])+1] = gh[deg(G[k])+1] + 1; }
+"generator degree histogram (index=deg+1):", gh;
+// cofactor degrees of GB elements w.r.t. the minimal generators
+matrix T;
+int t0 = timer;
+ideal J2 = liftstd(G, T);
+"liftstd from minimal generators: time", timer - t0, " GB size", size(J2);
+int i; int j; int mdc; int mdall = 0; int dg;
+intvec hist; hist[40] = 0;
+for (j = 1; j <= ncols(T); j++)
+{
+  mdc = 0;
+  for (i = 1; i <= size(G); i++) { if (T[i,j] != 0) { dg = deg(T[i,j]) + deg(G[i]); if (dg > mdc) { mdc = dg; } } }
+  hist[mdc+1] = hist[mdc+1] + 1;
+  if (mdc > mdall) { mdall = mdc; }
+}
+"max cofactor*generator degree:", mdall;
+"histogram (index=deg+1):", hist;
+write(":w Isat6_gens_gfp.txt", string(G));
+quit;

@@ -1,0 +1,4 @@
+numpy>=2.0
+scipy>=1.14
+sympy>=1.12
+# Use pip wheels (bundled OpenBLAS). A numpy linked against the reference BLAS is ~10x slower here.

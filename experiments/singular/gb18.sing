@@ -1,0 +1,51 @@
+// 18-variable formulation: entries of R2 (p11..p33) and R3 (q11..q33), all equations quadratic.
+LIB "matrix.lib";
+ring r = 32003, (p11,p12,p13,p21,p22,p23,p31,p32,p33,q11,q12,q13,q21,q22,q23,q31,q32,q33), dp;
+system("--random", 12345);
+matrix R2[3][3] = p11,p12,p13,p21,p22,p23,p31,p32,p33;
+matrix R3[3][3] = q11,q12,q13,q21,q22,q23,q31,q32,q33;
+ideal I; int k;
+for (k = 1; k <= 6; k++)
+{
+  matrix n1[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n2[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n3[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix M = concat(n1, R2*n2, R3*n3);
+  I[k] = det(M);
+}
+proc so3(matrix R)
+{
+  ideal E;
+  matrix G = transpose(R)*R;
+  E = G[1,1]-1, G[2,2]-1, G[3,3]-1, G[1,2], G[1,3], G[2,3];
+  // row3 = row1 x row2
+  E = E, R[3,1] - (R[1,2]*R[2,3]-R[1,3]*R[2,2]),
+         R[3,2] - (R[1,3]*R[2,1]-R[1,1]*R[2,3]),
+         R[3,3] - (R[1,1]*R[2,2]-R[1,2]*R[2,1]);
+  return(E);
+}
+I = I, so3(R2), so3(R3);
+"generators:", size(I);
+int t0 = timer;
+matrix T;
+ideal J = liftstd(I, T);
+"liftstd time (s):", timer - t0;
+"dim:", dim(J), " vdim:", vdim(J), " GB size:", size(J);
+int i; int j; int md; int mdall = 0; int dg; int mg = 0;
+intvec hist; hist[40] = 0;
+for (j = 1; j <= ncols(T); j++)
+{
+  md = 0;
+  for (i = 1; i <= size(I); i++) { if (T[i,j] != 0) { dg = deg(T[i,j]) + deg(I[i]); if (dg > md) { md = dg; } } }
+  hist[md+1] = hist[md+1] + 1;
+  if (md > mdall) { mdall = md; }
+  if (deg(J[j]) > mg) { mg = deg(J[j]); }
+}
+"max GB element degree:", mg;
+"max degree of cofactor*generator:", mdall;
+"histogram (index = degree+1):", hist;
+ideal K = kbase(J);
+md = 0; for (k = 1; k <= size(K); k++) { if (deg(K[k]) > md) { md = deg(K[k]); } }
+"standard monomials:", size(K), " max degree:", md;
+write(":w kbase18_gfp.txt", string(K));
+quit;

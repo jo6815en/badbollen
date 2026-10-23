@@ -1,0 +1,60 @@
+// Exact bigraded Hilbert functions at selected bidegrees for (I:s2), sat(I,s2), and the full saturation I*.
+LIB "matrix.lib"; LIB "elim.lib";
+ring r = 32003, (a,b,c,d,e,f,g,h), dp;
+system("--random", 12345);
+proc rotq(poly w, poly x, poly y, poly z)
+{
+  matrix R[3][3] =
+    w^2+x^2-y^2-z^2, 2*(x*y - w*z),   2*(x*z + w*y),
+    2*(x*y + w*z),   w^2-x^2+y^2-z^2, 2*(y*z - w*x),
+    2*(x*z - w*y),   2*(y*z + w*x),   w^2-x^2-y^2+z^2;
+  return(R);
+}
+matrix R2 = rotq(a,b,c,d); matrix R3 = rotq(e,f,g,h);
+ideal I; int k;
+for (k = 1; k <= 6; k++)
+{
+  matrix n1[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n2[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n3[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix M = concat(n1, R2*n2, R3*n3);
+  I[k] = det(M);
+}
+poly s2 = a^2+b^2+c^2+d^2;
+proc bideg(poly m) { intvec e = leadexp(m); return(intvec(e[1]+e[2]+e[3]+e[4], e[5]+e[6]+e[7]+e[8])); }
+// quotient dims at bidegrees (i,j) for i+j = d, i,j in [3..7]
+proc report(ideal J, string name)
+{
+  int d; int l; intvec bd;
+  for (d = 8; d <= 12; d++)
+  {
+    ideal K = kbase(J, d);
+    intvec cnt; cnt[d+1] = 0;
+    for (l = 1; l <= size(K); l++) { if (K[l] != 0) { bd = bideg(K[l]); cnt[bd[1]+1] = cnt[bd[1]+1] + 1; } }
+    string s = name + " total degree " + string(d) + " quotient dims for i=3..d-3:";
+    int i; for (i = 3; i <= d-3; i++) { s = s + " (" + string(i) + "," + string(d-i) + ")=" + string(cnt[i+1]); }
+    s;
+    kill K;
+  }
+}
+int t0 = timer;
+ideal Q1 = std(quotient(I, s2));
+"(I:s2) time", timer - t0, " dim", dim(Q1);
+report(Q1, "(I:s2)");
+t0 = timer;
+ideal Q2 = std(quotient(Q1, s2));
+"(I:s2^2) time", timer - t0, " dim", dim(Q2);
+report(Q2, "(I:s2^2)");
+t0 = timer;
+ideal S2 = std(quotient(Q2, s2));
+"(I:s2^3) time", timer - t0, " dim", dim(S2);
+report(S2, "(I:s2^3)");
+// full saturation: also by the irrelevant ideals
+t0 = timer;
+ideal m2 = a,b,c,d; ideal m3 = e,f,g,h;
+def T1 = sat(S2, m2); ideal J1; if (typeof(T1) == "list") { J1 = T1[1]; } else { J1 = T1; }
+def T2 = sat(J1, m3); ideal J2; if (typeof(T2) == "list") { J2 = T2[1]; } else { J2 = T2; }
+J2 = std(J2);
+"I* (sat by s2^3, m2, m3) time", timer - t0, " dim", dim(J2);
+report(J2, "I*");
+quit;

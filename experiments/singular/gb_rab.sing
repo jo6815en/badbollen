@@ -1,0 +1,37 @@
+// Rabinowitsch form: extra variable t with t*(1+|v2|^2)(1+|v3|^2) = 1 makes the ideal zero-dim directly.
+LIB "matrix.lib";
+ring r = 32003, (b,c,d,f,g,h,t), dp;
+system("--random", 12345);
+proc rot(poly x, poly y, poly z)
+{
+  matrix R[3][3] =
+    1+x^2-y^2-z^2, 2*(x*y - z),     2*(x*z + y),
+    2*(x*y + z),   1-x^2+y^2-z^2,   2*(y*z - x),
+    2*(x*z - y),   2*(y*z + x),     1-x^2-y^2+z^2;
+  return(R);
+}
+matrix R2 = rot(b,c,d); matrix R3 = rot(f,g,h);
+ideal I; int k;
+for (k = 1; k <= 6; k++)
+{
+  matrix n1[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n2[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n3[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix M = concat(n1, R2*n2, R3*n3);
+  I[k] = det(M);
+}
+I[7] = t*(1+b^2+c^2+d^2)*(1+f^2+g^2+h^2) - 1;
+int t0 = timer;
+ideal J = std(I);
+"GB time (s):", timer - t0;
+"dim:", dim(J), " vdim:", vdim(J);
+"GB size:", size(J);
+int md = 0; for (k = 1; k <= size(J); k++) { if (deg(J[k]) > md) { md = deg(J[k]); } }
+"max GB element degree:", md;
+ideal K = kbase(J);
+"standard monomials:", size(K);
+md = 0; int nt = 0; for (k = 1; k <= size(K); k++) { if (deg(K[k]) > md) { md = deg(K[k]); } if (deg(K[k], 0) < 0) { } if (subst(K[k], t, 0) == 0) { nt++; } }
+"max standard monomial degree:", md;
+"standard monomials containing t:", nt;
+write(":w kbase_gfp.txt", string(K));
+quit;

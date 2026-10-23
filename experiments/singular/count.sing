@@ -1,0 +1,39 @@
+// Count complex solutions of the concentric-balls problem (generic instance, finite field).
+// Unknowns: Cayley parameters of R2 = (b,c,d) and R3 = (f,g,h); ball 1 fixed.
+LIB "elim.lib";
+ring r = 32003, (b,c,d,f,g,h), dp;
+system("--random", 12345);
+
+proc rot(poly x, poly y, poly z)
+{
+  matrix R[3][3] =
+    1+x^2-y^2-z^2, 2*(x*y - z),     2*(x*z + y),
+    2*(x*y + z),   1-x^2+y^2-z^2,   2*(y*z - x),
+    2*(x*z - y),   2*(y*z + x),     1-x^2-y^2+z^2;
+  return(R);
+}
+matrix R2 = rot(b,c,d);
+matrix R3 = rot(f,g,h);
+
+ideal I;
+int k;
+for (k = 1; k <= 6; k++)
+{
+  matrix n1[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n2[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n3[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix M = concat(n1, R2*n2, R3*n3);
+  I[k] = det(M);
+}
+ideal Q = (1+b^2+c^2+d^2)*(1+f^2+g^2+h^2);
+def S = sat(I, Q);
+ideal J;
+if (typeof(S) == "list") { J = S[1]; } else { J = S; }
+J = std(J);
+"dim (0 = finite):", dim(J);
+"number of solutions with multiplicity (vdim):", vdim(J);
+"degree:", degree(J);
+// also the raw ideal before saturation
+ideal I0 = std(I);
+"raw ideal dim:", dim(I0);
+quit;

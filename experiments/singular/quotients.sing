@@ -1,0 +1,50 @@
+// How much of I_sat_{<=6}, I_sat_{<=7} is reached by (I : s2^i s3^j)?
+LIB "elim.lib"; LIB "matrix.lib";
+ring r = 32003, (b,c,d,f,g,h), dp;
+system("--random", 12345);
+proc rot(poly x, poly y, poly z)
+{
+  matrix R[3][3] =
+    1+x^2-y^2-z^2, 2*(x*y - z),     2*(x*z + y),
+    2*(x*y + z),   1-x^2+y^2-z^2,   2*(y*z - x),
+    2*(x*z - y),   2*(y*z + x),     1-x^2-y^2+z^2;
+  return(R);
+}
+matrix R2 = rot(b,c,d); matrix R3 = rot(f,g,h);
+ideal I; int k;
+for (k = 1; k <= 6; k++)
+{
+  matrix n1[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n2[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix n3[3][1] = random(-50,50), random(-50,50), random(-50,50);
+  matrix M = concat(n1, R2*n2, R3*n3);
+  I[k] = det(M);
+}
+poly s2 = 1+b^2+c^2+d^2; poly s3 = 1+f^2+g^2+h^2;
+// count ideal elements of degree <= D via standard monomials: dim I_{<=D} = #mon_{<=D} - #std mon_{<=D}
+proc idealdims(ideal J, int D)
+{
+  intvec out; int d; int tot = 0; int std_ = 0;
+  for (d = 0; d <= D; d++)
+  {
+    ideal K = kbase(J, d);
+    int nk = size(K); if (nk == 1) { if (K[1] == 0) { nk = 0; } }
+    std_ = std_ + nk;
+    tot = tot + size(kbase(std(ideal(0)), d));  // # monomials of degree d
+    out[d+1] = tot - std_;
+    kill K;
+  }
+  return(out);
+}
+ideal J0 = std(I);
+"I_raw   dim I_{<=d}, d=0..7:", idealdims(J0, 7);
+int i; int j; int t0;
+for (i = 0; i <= 4; i++) { for (j = 0; j <= 2; j++) {
+  if (i + j > 0) {
+    t0 = timer;
+    ideal Q = std(quotient(I, s2^i * s3^j));
+    "(I : s2^" + string(i) + " s3^" + string(j) + ")  dim I_{<=d}:", idealdims(Q, 7), "  time", timer - t0;
+    kill Q;
+  }
+}}
+quit;
