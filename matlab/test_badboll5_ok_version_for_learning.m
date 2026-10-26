@@ -50,6 +50,10 @@ gt_sol = [tmp1;tmp2];
 %     evaluate(eqs,asol)
 % end
 
+%%
+
+t0 = tic;
+
 %% Generate the six equations
 
 n = 8;
@@ -432,3 +436,8 @@ disp('Om allt gått bra är de två kolumnerna lika')
 disp('Kollar två lösningar till')
 evaluate(eqs,sols(:,1))
 evaluate(eqs,sols(:,42))
+
+%%
+
+t1 = toc(t0);
+% 56 sekunder
